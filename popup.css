@@ -1,0 +1,351 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: #e8f1fa;
+    color: #1a3352;
+    min-height: 400px;
+}
+
+.container {
+    width: 320px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(30, 80, 140, 0.12);
+    overflow: hidden;
+}
+
+.header {
+    background: #2680c2;
+    color: #fff;
+    padding: 16px 20px;
+}
+
+.header h2 {
+    font-size: 15px;
+    font-weight: 500;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.content {
+    padding: 16px;
+}
+
+.info {
+    background: #f0f6fc;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    border: 1px solid #c8ddf0;
+}
+
+.info p {
+    margin: 4px 0;
+    font-size: 13px;
+    color: #4a6a8a;
+}
+
+.info span {
+    font-weight: 500;
+    color: #1a3352;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background: #2680c2;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #1d6aa8;
+}
+
+.btn-secondary {
+    background: #e4f0fa;
+    color: #1d6aa8;
+}
+
+.btn-secondary:hover {
+    background: #d0e4f4;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #2680c2;
+    border: 1px solid #a8cce8;
+}
+
+.btn-outline:hover {
+    background: #f0f6fc;
+    border-color: #7bb8dc;
+}
+
+.btn-danger {
+    background: #fff;
+    color: #dc3545;
+    border: 1px solid #f0b0b0;
+}
+
+.btn-danger:hover {
+    background: #fef2f2;
+    border-color: #e08888;
+}
+
+.btn-small {
+    padding: 8px 14px;
+    font-size: 12px;
+}
+
+.status {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.status.success {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.status.error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.status.info {
+    background: #f0f6fc;
+    color: #1d6aa8;
+    border: 1px solid #b0d0ec;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.cookie-details {
+    margin-top: 12px;
+}
+
+.cookie-details h3,
+.cookie-keys h3,
+.set-cookie-form h3 {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #4a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#cookie-text {
+    width: 100%;
+    height: 120px;
+    padding: 10px;
+    border: 1px solid #c8ddf0;
+    border-radius: 6px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    background: #f8fafc;
+    resize: vertical;
+    line-height: 1.5;
+    color: #1a3352;
+}
+
+#cookie-text:focus {
+    outline: none;
+    border-color: #2680c2;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #a8cce8;
+    border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #7bb8dc;
+}
+
+/* Cookie Keys 样式 */
+.cookie-keys {
+    margin-top: 12px;
+}
+
+.cookie-keys-list {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid #c8ddf0;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.cookie-key-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0ecf6;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cookie-key-item:last-child {
+    border-bottom: none;
+}
+
+.cookie-key-item:hover {
+    background-color: #e4f0fa;
+}
+
+.cookie-key-item:active {
+    background-color: #d0e4f4;
+}
+
+.cookie-key-name {
+    font-weight: 500;
+    color: #1d6aa8;
+    flex: 1;
+    margin-right: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cookie-key-hint {
+    font-size: 10px;
+    color: #7a9ab8;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.cookie-key-item:hover .cookie-key-hint {
+    opacity: 1;
+}
+
+/* 设置Cookie表单样式 */
+.set-cookie-form {
+    margin-top: 12px;
+    padding: 14px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #c8ddf0;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 11px;
+    color: #4a6a8a;
+    margin-bottom: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #c8ddf0;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: border-color 0.15s;
+    background: #fff;
+    color: #1a3352;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #2680c2;
+}
+
+.form-group input::placeholder {
+    color: #98b4cc;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #2680c2;
+}
+
+.form-checkbox label {
+    font-size: 12px;
+    color: #4a6a8a;
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.form-actions .btn {
+    flex: 1;
+}

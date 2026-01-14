@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px;
+            background: #e8f1fa;
+            min-height: 100vh;
+            color: #1a3352;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 12px;
+            padding: 48px;
+            box-shadow: 0 2px 16px rgba(30, 80, 140, 0.12);
+            border: 1px solid #c8ddf0;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 24px;
+            background: #2680c2;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo svg {
+            width: 32px;
+            height: 32px;
+            fill: #fff;
+        }
+
+        h1 {
+            color: #1a3352;
+            margin: 0 0 12px 0;
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #4a6a8a;
+            font-size: 16px;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin: 48px 0;
+        }
+
+        @media (max-width: 600px) {
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .feature {
+            text-align: center;
+            padding: 24px 16px;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px solid #c8ddf0;
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            background: #2680c2;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: #fff;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .feature h3 {
+            color: #1a3352;
+            margin: 0 0 8px 0;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .feature p {
+            color: #4a6a8a;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .getting-started {
+            background: #f8fafc;
+            border: 1px solid #c8ddf0;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 48px 0;
+        }
+
+        .getting-started h2 {
+            color: #1a3352;
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .steps {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .steps li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+            color: #3a5570;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .steps li:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            background: #2680c2;
+            color: #fff;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid #c8ddf0;
+        }
+
+        .footer p {
+            color: #4a6a8a;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #2680c2;
+            color: #fff;
+            padding: 12px 32px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: background 0.15s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #1d6aa8;
+        }
+
+        .version {
+            color: #7a9ab8;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+            </div>
+            <h1>Cookie Manager</h1>
+            <p class="subtitle">快速管理当前网页的Cookie，简化开发调试流程</p>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <polyline points="13 17 18 12 13 7"></polyline>
+                        <polyline points="6 17 11 12 6 7"></polyline>
+                    </svg>
+                </div>
+                <h3>快速复制</h3>
+                <p>一键复制当前页面的全部Cookie信息</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h3>本地处理</h3>
+                <p>所有操作均在本地完成，数据不会外传</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </div>
+                <h3>多种格式</h3>
+                <p>支持多种输出格式，适配不同场景</p>
+            </div>
+        </div>
+
+        <div class="getting-started">
+            <h2>快速开始</h2>
+            <ol class="steps">
+                <li>
+                    <span class="step-number">1</span>
+                    <span>访问任意网站页面</span>
+                </li>
+                <li>
+                    <span class="step-number">2</span>
+                    <span>点击浏览器工具栏中的扩展图标</span>
+                </li>
+                <li>
+                    <span class="step-number">3</span>
+                    <span>选择需要的操作：复制、查看或管理Cookie</span>
+                </li>
+            </ol>
+        </div>
+
+        <div class="footer">
+            <p>感谢使用 Cookie Manager</p>
+            <button class="btn" onclick="window.close()">开始使用</button>
+            <div class="version">v1.0</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Cookie Manager welcome page loaded');
+        });
+
+        document.querySelector('.btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.close();
+        });
+    </script>
+</body>
+</html>

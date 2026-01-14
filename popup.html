@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie复制器</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Cookie Manager</h2>
+        </div>
+
+        <div class="content">
+            <div class="info">
+                <p id="domain-info">当前域名: <span id="current-domain">加载中...</span></p>
+                <p id="cookie-count">Cookie数量: <span id="count">0</span></p>
+            </div>
+
+            <div class="actions">
+                <button id="copy-cookies" class="btn btn-primary">
+                    复制全部
+                </button>
+
+                <button id="copy-formatted" class="btn btn-secondary">
+                    复制详情
+                </button>
+
+                <button id="view-cookies" class="btn btn-outline">
+                    查看列表
+                </button>
+
+                <button id="clear-cookies" class="btn btn-danger">
+                    清空Cookie
+                </button>
+
+                <button id="set-cookie" class="btn btn-outline">
+                    添加Cookie
+                </button>
+            </div>
+
+            <div id="status" class="status hidden"></div>
+
+            <div id="cookie-details" class="cookie-details hidden">
+                <h3>Cookie详情:</h3>
+                <textarea id="cookie-text" readonly></textarea>
+            </div>
+
+            <div id="cookie-keys" class="cookie-keys hidden">
+                <h3>Cookie列表 (点击复制):</h3>
+                <div id="cookie-keys-list" class="cookie-keys-list"></div>
+            </div>
+
+            <div id="set-cookie-form" class="set-cookie-form hidden">
+                <h3>设置Cookie:</h3>
+                <div class="form-group">
+                    <label for="cookie-name">Cookie名称 *</label>
+                    <input type="text" id="cookie-name" placeholder="输入Cookie名称">
+                </div>
+                <div class="form-group">
+                    <label for="cookie-value">Cookie值 *</label>
+                    <input type="text" id="cookie-value" placeholder="输入Cookie值">
+                </div>
+                <div class="form-group">
+                    <label for="cookie-path">路径</label>
+                    <input type="text" id="cookie-path" placeholder="/" value="/">
+                </div>
+                <div class="form-group">
+                    <label for="cookie-expiry">过期时间 (天)</label>
+                    <input type="number" id="cookie-expiry" placeholder="30" value="30" min="1">
+                </div>
+                <div class="form-row">
+                    <div class="form-checkbox">
+                        <input type="checkbox" id="cookie-secure">
+                        <label for="cookie-secure">Secure</label>
+                    </div>
+                    <div class="form-checkbox">
+                        <input type="checkbox" id="cookie-httponly">
+                        <label for="cookie-httponly">HttpOnly</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="cookie-samesite">SameSite</label>
+                    <select id="cookie-samesite">
+                        <option value="lax">Lax</option>
+                        <option value="strict">Strict</option>
+                        <option value="no_restriction">None</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button id="save-cookie" class="btn btn-primary btn-small">保存</button>
+                    <button id="cancel-cookie" class="btn btn-secondary btn-small">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
