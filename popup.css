@@ -349,3 +349,157 @@ body {
 .form-actions .btn {
     flex: 1;
 }
+
+/* 定时同步入口按钮 —— 与上方 .actions 内按钮保持一致的整行宽度 */
+.sync-toggle-btn {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* 定时同步面板 */
+.sync-panel {
+    margin-top: 12px;
+    padding: 14px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #c8ddf0;
+}
+
+.sync-panel h3 {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: #4a6a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sync-enable-row {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #c8ddf0;
+    border-radius: 4px;
+}
+
+.domain-input-row {
+    display: flex;
+    gap: 6px;
+}
+
+.domain-input-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #c8ddf0;
+    border-radius: 4px;
+    font-size: 12px;
+    background: #fff;
+    color: #1a3352;
+}
+
+.domain-input-row input:focus {
+    outline: none;
+    border-color: #2680c2;
+}
+
+.domain-input-row .btn-small {
+    padding: 6px 10px;
+    flex-shrink: 0;
+}
+
+.sync-add-current-btn {
+    margin-top: 6px;
+    width: 100%;
+}
+
+.sync-domain-list {
+    margin-top: 8px;
+    max-height: 120px;
+    overflow-y: auto;
+    border: 1px solid #c8ddf0;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.sync-domain-list:empty::after {
+    content: '尚未添加域名';
+    display: block;
+    padding: 10px;
+    text-align: center;
+    font-size: 11px;
+    color: #98b4cc;
+}
+
+.sync-domain-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid #e0ecf6;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+}
+
+.sync-domain-item:last-child {
+    border-bottom: none;
+}
+
+.sync-domain-item .domain-text {
+    flex: 1;
+    color: #1d6aa8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 6px;
+}
+
+.sync-domain-item .domain-remove {
+    background: transparent;
+    border: none;
+    color: #b91c1c;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.sync-domain-item .domain-remove:hover {
+    color: #dc3545;
+}
+
+.sync-meta p {
+    margin: 4px 0;
+    font-size: 11px;
+    color: #4a6a8a;
+}
+
+.sync-meta span {
+    font-weight: 500;
+    color: #1a3352;
+}
+
+.fsa-dir-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fsa-dir-name {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #c8ddf0;
+    border-radius: 4px;
+    background: #fff;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    color: #1a3352;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fsa-tip {
+    margin-top: 4px;
+    font-size: 10px;
+    color: #98b4cc;
+}

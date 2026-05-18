@@ -5,7 +5,10 @@
   "description": "一键复制当前网页的所有Cookie",
   "permissions": [
     "activeTab",
-    "cookies"
+    "cookies",
+    "alarms",
+    "storage",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"

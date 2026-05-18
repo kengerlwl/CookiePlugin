@@ -25,10 +25,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         return tab;
     }
 
+    // 判断 tab.url 是否是普通网页（http/https），用于决定能否取 Cookie/域名
+    function isWebUrl(u) {
+        if (!u) return false;
+        return /^https?:\/\//i.test(u);
+    }
+
     // 获取当前域名的所有Cookie
     async function getCookies() {
         try {
             const tab = await getCurrentTab();
+
+            if (!tab || !isWebUrl(tab.url)) {
+                // 非网页（chrome://、扩展页、空白页等）
+                currentDomain = '';
+                currentCookies = [];
+                domainSpan.textContent = '非网页';
+                countSpan.textContent = '0';
+                return [];
+            }
+
             const url = new URL(tab.url);
             currentDomain = url.hostname;
 
@@ -356,6 +372,300 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('cookie-httponly').checked = false;
         document.getElementById('cookie-samesite').value = 'lax';
     }
+
+    // ============================================================
+    // 定时同步功能
+    // ============================================================
+    const togglePanelBtn = document.getElementById('toggle-sync-panel');
+    const syncPanel = document.getElementById('sync-panel');
+    const syncEnabledChk = document.getElementById('sync-enabled');
+    const syncIntervalSel = document.getElementById('sync-interval');
+    const syncWriteModeSel = document.getElementById('sync-write-mode');
+    const fsaDirRow = document.getElementById('fsa-dir-row');
+    const fsaDirName = document.getElementById('fsa-dir-name');
+    const fsaPickDirBtn = document.getElementById('fsa-pick-dir');
+    const syncDomainInput = document.getElementById('sync-domain-input');
+    const syncAddDomainBtn = document.getElementById('sync-add-domain');
+    const syncAddCurrentBtn = document.getElementById('sync-add-current');
+    const syncDomainList = document.getElementById('sync-domain-list');
+    const syncLastTime = document.getElementById('sync-last-time');
+    const syncLastStatus = document.getElementById('sync-last-status');
+    const syncSaveBtn = document.getElementById('sync-save');
+    const syncRunNowBtn = document.getElementById('sync-run-now');
+
+    // popup 内持有的 FSA 目录句柄（仅 popup 打开期间有效）
+    let fsaDirHandle = null;
+
+    const DEFAULT_SYNC_CONFIG = {
+        enabled: false,
+        intervalMinutes: 5,
+        writeMode: 'download',
+        domains: [],
+        fsaDirName: '',
+        lastSyncTime: 0,
+        lastSyncStatus: ''
+    };
+
+    function ensureStorageAvailable() {
+        if (!chrome || !chrome.storage || !chrome.storage.local) {
+            throw new Error('storage 权限不可用，请在 chrome://extensions 重新加载本扩展');
+        }
+    }
+
+    async function loadSyncConfig() {
+        ensureStorageAvailable();
+        const { syncConfig } = await chrome.storage.local.get('syncConfig');
+        return Object.assign({}, DEFAULT_SYNC_CONFIG, syncConfig || {});
+    }
+
+    async function saveSyncConfig(config) {
+        ensureStorageAvailable();
+        await chrome.storage.local.set({ syncConfig: config });
+    }
+
+    function renderDomainList(domains) {
+        syncDomainList.innerHTML = '';
+        domains.forEach((d, idx) => {
+            const item = document.createElement('div');
+            item.className = 'sync-domain-item';
+            item.innerHTML = `
+                <span class="domain-text" title="${d}">${d}</span>
+                <button class="domain-remove" data-idx="${idx}" title="移除">×</button>
+            `;
+            item.querySelector('.domain-remove').addEventListener('click', async () => {
+                const cfg = await loadSyncConfig();
+                cfg.domains.splice(idx, 1);
+                await saveSyncConfig(cfg);
+                renderDomainList(cfg.domains);
+                showStatus('已移除域名', 'info');
+            });
+            syncDomainList.appendChild(item);
+        });
+    }
+
+    function formatTime(ts) {
+        if (!ts) return '从未';
+        return new Date(ts).toLocaleString();
+    }
+
+    function refreshFsaDirRow(mode, dirNameText) {
+        if (mode === 'fsa') {
+            fsaDirRow.classList.remove('hidden');
+            fsaDirName.textContent = dirNameText || '未选择';
+        } else {
+            fsaDirRow.classList.add('hidden');
+        }
+    }
+
+    async function refreshSyncUI() {
+        const cfg = await loadSyncConfig();
+        syncEnabledChk.checked = cfg.enabled;
+        syncIntervalSel.value = String(cfg.intervalMinutes);
+        syncWriteModeSel.value = cfg.writeMode;
+        refreshFsaDirRow(cfg.writeMode, cfg.fsaDirName);
+        renderDomainList(cfg.domains);
+        syncLastTime.textContent = formatTime(cfg.lastSyncTime);
+        syncLastStatus.textContent = cfg.lastSyncStatus || '空闲';
+    }
+
+    function normalizeDomain(input) {
+        if (!input) return '';
+        let d = input.trim().toLowerCase();
+        if (d.startsWith('http://') || d.startsWith('https://')) {
+            try { d = new URL(d).hostname; } catch (_) { /* ignore */ }
+        }
+        d = d.split('/')[0];
+        d = d.split(':')[0];
+        return d;
+    }
+
+    togglePanelBtn.addEventListener('click', () => {
+        syncPanel.classList.toggle('hidden');
+    });
+
+    syncWriteModeSel.addEventListener('change', () => {
+        refreshFsaDirRow(syncWriteModeSel.value, fsaDirName.textContent);
+    });
+
+    fsaPickDirBtn.addEventListener('click', async () => {
+        if (typeof window.showDirectoryPicker !== 'function') {
+            showStatus('当前浏览器不支持 File System Access API', 'error');
+            return;
+        }
+        try {
+            const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            fsaDirHandle = handle;
+            fsaDirName.textContent = handle.name;
+            const cfg = await loadSyncConfig();
+            cfg.fsaDirName = handle.name;
+            await saveSyncConfig(cfg);
+            showStatus(`已选择目录：${handle.name}`, 'success');
+        } catch (err) {
+            if (err && err.name !== 'AbortError') {
+                console.error(err);
+                showStatus('选择目录失败：' + err.message, 'error');
+            }
+        }
+    });
+
+    syncAddDomainBtn.addEventListener('click', async () => {
+        const d = normalizeDomain(syncDomainInput.value);
+        if (!d) {
+            showStatus('请输入有效域名', 'error');
+            return;
+        }
+        const cfg = await loadSyncConfig();
+        if (cfg.domains.includes(d)) {
+            showStatus('该域名已存在', 'info');
+            return;
+        }
+        cfg.domains.push(d);
+        await saveSyncConfig(cfg);
+        syncDomainInput.value = '';
+        renderDomainList(cfg.domains);
+        showStatus(`已添加：${d}`, 'success');
+    });
+
+    syncDomainInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            syncAddDomainBtn.click();
+        }
+    });
+
+    syncAddCurrentBtn.addEventListener('click', async () => {
+        try {
+            const tab = await getCurrentTab();
+            if (!tab || !isWebUrl(tab.url)) {
+                showStatus('当前不是普通网页（chrome:// 等不支持），请切到目标网站后再点', 'error');
+                return;
+            }
+            const d = new URL(tab.url).hostname;
+            if (!d) {
+                showStatus('无法解析当前域名', 'error');
+                return;
+            }
+            const cfg = await loadSyncConfig();
+            if (cfg.domains.includes(d)) {
+                showStatus('该域名已存在', 'info');
+                return;
+            }
+            cfg.domains.push(d);
+            await saveSyncConfig(cfg);
+            renderDomainList(cfg.domains);
+            showStatus(`已添加：${d}`, 'success');
+        } catch (err) {
+            console.error('添加当前域名失败:', err);
+            showStatus('添加失败：' + err.message, 'error');
+        }
+    });
+
+    syncSaveBtn.addEventListener('click', async () => {
+        const cfg = await loadSyncConfig();
+        cfg.enabled = syncEnabledChk.checked;
+        cfg.intervalMinutes = parseInt(syncIntervalSel.value, 10) || 5;
+        cfg.writeMode = syncWriteModeSel.value;
+        await saveSyncConfig(cfg);
+
+        chrome.runtime.sendMessage({ action: 'syncConfigUpdated' }, () => {
+            showStatus('配置已保存', 'success');
+        });
+    });
+
+    syncRunNowBtn.addEventListener('click', async () => {
+        const cfg = await loadSyncConfig();
+        if (!cfg.domains || cfg.domains.length === 0) {
+            showStatus('请先添加要监控的域名', 'error');
+            return;
+        }
+
+        if (cfg.writeMode === 'fsa' && fsaDirHandle) {
+            try {
+                const result = await syncCookiesViaFSA(cfg.domains, fsaDirHandle);
+                cfg.lastSyncTime = Date.now();
+                cfg.lastSyncStatus = `成功（FSA）：${result.length} 个域名`;
+                await saveSyncConfig(cfg);
+                await refreshSyncUI();
+                showStatus(`已写入 ${result.length} 个文件到 ${fsaDirHandle.name}`, 'success');
+            } catch (err) {
+                console.error(err);
+                cfg.lastSyncStatus = '失败：' + err.message;
+                await saveSyncConfig(cfg);
+                await refreshSyncUI();
+                showStatus('写入失败：' + err.message, 'error');
+            }
+            return;
+        }
+
+        if (cfg.writeMode === 'fsa' && !fsaDirHandle) {
+            showStatus('FSA 模式需先选择目录，将自动降级为下载', 'info');
+        }
+
+        chrome.runtime.sendMessage({ action: 'runSyncNow' }, (resp) => {
+            if (resp && resp.success) {
+                showStatus(`已触发同步 ${resp.count} 个域名`, 'success');
+                setTimeout(refreshSyncUI, 800);
+            } else {
+                showStatus('同步失败：' + (resp && resp.error || '未知错误'), 'error');
+            }
+        });
+    });
+
+    async function syncCookiesViaFSA(domains, dirHandle) {
+        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+            const req = await dirHandle.requestPermission({ mode: 'readwrite' });
+            if (req !== 'granted') {
+                throw new Error('未授予目录写入权限');
+            }
+        }
+
+        const written = [];
+        for (const domain of domains) {
+            const cookies = await chrome.cookies.getAll({ domain });
+            const text = cookiesToNetscape(cookies);
+            const filename = `cookies-${sanitizeFilename(domain)}.txt`;
+            const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(text);
+            await writable.close();
+            written.push(domain);
+        }
+        return written;
+    }
+
+    function sanitizeFilename(name) {
+        return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    function cookiesToNetscape(cookies) {
+        const header = [
+            '# Netscape HTTP Cookie File',
+            '# Generated by Cookie复制器',
+            `# ${new Date().toISOString()}`,
+            ''
+        ].join('\n');
+
+        const lines = cookies.map(c => {
+            const domain = c.domain.startsWith('.') ? c.domain : (c.hostOnly ? c.domain : '.' + c.domain);
+            const includeSubdomains = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+            const path = c.path || '/';
+            const secure = c.secure ? 'TRUE' : 'FALSE';
+            const expiration = c.expirationDate ? Math.floor(c.expirationDate) : 0;
+            return [domain, includeSubdomains, path, secure, expiration, c.name, c.value].join('\t');
+        });
+
+        return header + lines.join('\n') + '\n';
+    }
+
+    // 监听 storage 变化，实时刷新 UI（例如 background 完成同步后写入 lastSyncTime）
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.syncConfig) {
+            refreshSyncUI();
+        }
+    });
+
+    await refreshSyncUI();
 
     // 页面加载时自动获取Cookie信息
     await getCookies();

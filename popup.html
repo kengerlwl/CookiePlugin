@@ -52,6 +52,67 @@
                 <div id="cookie-keys-list" class="cookie-keys-list"></div>
             </div>
 
+            <button id="toggle-sync-panel" class="btn btn-outline sync-toggle-btn">
+                定时同步网站cookie
+            </button>
+
+            <div id="sync-panel" class="sync-panel hidden">
+                <h3>定时同步配置</h3>
+
+                <div class="form-checkbox sync-enable-row">
+                    <input type="checkbox" id="sync-enabled">
+                    <label for="sync-enabled">启用定时同步</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="sync-interval">同步间隔</label>
+                    <select id="sync-interval">
+                        <option value="1">每 1 分钟</option>
+                        <option value="5" selected>每 5 分钟</option>
+                        <option value="15">每 15 分钟</option>
+                        <option value="30">每 30 分钟</option>
+                        <option value="60">每 60 分钟</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="sync-write-mode">写入方式</label>
+                    <select id="sync-write-mode">
+                        <option value="download">下载到 Downloads/cookies/</option>
+                        <option value="fsa">写入到指定目录 (FSA)</option>
+                    </select>
+                </div>
+
+                <div id="fsa-dir-row" class="form-group hidden">
+                    <label>本地目录</label>
+                    <div class="fsa-dir-line">
+                        <span id="fsa-dir-name" class="fsa-dir-name">未选择</span>
+                        <button id="fsa-pick-dir" class="btn btn-outline btn-small">选择目录</button>
+                    </div>
+                    <p class="fsa-tip">注意：浏览器重启后需要重新选择目录</p>
+                </div>
+
+                <div class="form-group">
+                    <label>监控的域名</label>
+                    <div class="domain-input-row">
+                        <input type="text" id="sync-domain-input" placeholder="如 github.com 或 .sankuai.com">
+                        <button id="sync-add-domain" class="btn btn-primary btn-small">添加</button>
+                    </div>
+                    <button id="sync-add-current" class="btn btn-secondary btn-small sync-add-current-btn">添加当前域名</button>
+                    <div id="sync-domain-list" class="sync-domain-list"></div>
+                </div>
+
+                <div class="form-group sync-meta">
+                    <p>上次同步: <span id="sync-last-time">从未</span></p>
+                    <p>状态: <span id="sync-last-status">空闲</span></p>
+                </div>
+
+                <div class="form-actions">
+                    <button id="sync-save" class="btn btn-primary btn-small">保存配置</button>
+                    <button id="sync-run-now" class="btn btn-outline btn-small">立即同步</button>
+                </div>
+            </div>
+
             <div id="set-cookie-form" class="set-cookie-form hidden">
                 <h3>设置Cookie:</h3>
                 <div class="form-group">
