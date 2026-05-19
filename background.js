@@ -31,6 +31,9 @@ chrome.runtime.onStartup.addListener(() => {
 
 // 监听来自popup或content script的消息
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+    // 发给 offscreen 的消息由 offscreen.js 处理，service worker 忽略
+    if (request && request.target === 'offscreen') return false;
+
     console.log('收到消息:', request);
 
     switch (request.action) {
@@ -288,8 +291,10 @@ async function runCookieSync({ trigger } = {}) {
     for (const domain of cfg.domains) {
         try {
             const cookies = await chrome.cookies.getAll({ domain });
-            const text = cookiesToNetscape(cookies, domain);
-            const filename = `cookies/cookies-${sanitizeFilename(domain)}.txt`;
+            const text = cookiesToHeader(cookies);
+            // 注意：filename 不要带子目录，Chrome 对 blob: URL + 带斜杠 filename 在某些
+            // 场景会丢弃 filename 退回默认名（变成 uuid 或「下载.txt」）。
+            const filename = `cookies-${sanitizeFilename(domain)}.txt`;
             await downloadAsFile(text, filename);
             success++;
         } catch (err) {
@@ -310,72 +315,121 @@ async function runCookieSync({ trigger } = {}) {
     return { count: success, errors };
 }
 
-// 通过 chrome.downloads 把内容写入下载目录
-// 注意：MV3 service worker 不能用 URL.createObjectURL(Blob)（Blob 不支持），
-// 改用 data URL 写入。
-async function downloadAsFile(text, filename) {
-    // 用 base64 编码避免特殊字符问题
-    const base64 = base64EncodeUtf8(text);
-    const dataUrl = `data:text/plain;base64,${base64}`;
+// MV3 service worker 不支持 URL.createObjectURL(Blob)（chromium bug 1224027），
+// 因此通过一个 offscreen document 来代为制造 blob: URL，再由 service worker
+// 调用 chrome.downloads.download 完成下载——这是官方推荐的做法。
 
+const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
+let creatingOffscreen = null;
+
+async function ensureOffscreenDocument() {
+    // 已存在则直接返回
+    if (await hasOffscreenDocument()) return;
+    if (creatingOffscreen) {
+        await creatingOffscreen;
+        return;
+    }
+    creatingOffscreen = chrome.offscreen.createDocument({
+        url: OFFSCREEN_DOCUMENT_PATH,
+        reasons: ['BLOBS'],
+        justification: '生成 blob: URL 用于把 cookie 写入下载文件'
+    }).finally(() => {
+        creatingOffscreen = null;
+    });
+    await creatingOffscreen;
+}
+
+async function hasOffscreenDocument() {
+    if (!chrome.runtime.getContexts) return false;
+    const contexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+        documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)]
+    });
+    return contexts && contexts.length > 0;
+}
+
+function sendOffscreen(payload) {
     return new Promise((resolve, reject) => {
-        chrome.downloads.download({
-            url: dataUrl,
-            filename: filename,
-            conflictAction: 'overwrite',
-            saveAs: false
-        }, (downloadId) => {
+        chrome.runtime.sendMessage({ target: 'offscreen', ...payload }, (resp) => {
             if (chrome.runtime.lastError) {
                 reject(new Error(chrome.runtime.lastError.message));
-            } else if (typeof downloadId === 'undefined') {
-                reject(new Error('下载未启动'));
+            } else if (!resp) {
+                reject(new Error('offscreen 无响应'));
+            } else if (!resp.success) {
+                reject(new Error(resp.error || 'offscreen 处理失败'));
             } else {
-                resolve(downloadId);
+                resolve(resp);
             }
         });
     });
 }
 
-// UTF-8 安全的 base64 编码
-function base64EncodeUtf8(str) {
-    // 在 service worker 中没有 window，但 btoa 可用
-    const bytes = new TextEncoder().encode(str);
-    let binary = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+// 通过 chrome.downloads 把内容写入下载目录
+async function downloadAsFile(text, filename) {
+    await ensureOffscreenDocument();
+    const { url: blobUrl } = await sendOffscreen({
+        action: 'createBlobUrl',
+        text,
+        mimeType: 'text/plain;charset=utf-8'
+    });
+
+    try {
+        const downloadId = await new Promise((resolve, reject) => {
+            chrome.downloads.download({
+                url: blobUrl,
+                filename: filename,
+                conflictAction: 'overwrite',
+                saveAs: false
+            }, (id) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (typeof id === 'undefined') {
+                    reject(new Error('下载未启动'));
+                } else {
+                    resolve(id);
+                }
+            });
+        });
+
+        // 等下载真正完成后再释放 ObjectURL，避免下载中途被中断
+        await waitDownloadComplete(downloadId);
+        return downloadId;
+    } finally {
+        // 不阻塞主流程：撤销失败也只是泄漏一份内存，下次 SW 重启会回收
+        sendOffscreen({ action: 'revokeBlobUrl', url: blobUrl }).catch(() => {});
     }
-    return btoa(binary);
+}
+
+// 等待某个下载到达 complete/interrupted 终态
+function waitDownloadComplete(downloadId) {
+    return new Promise((resolve) => {
+        const onChanged = (delta) => {
+            if (delta.id !== downloadId) return;
+            if (delta.state && (delta.state.current === 'complete' || delta.state.current === 'interrupted')) {
+                chrome.downloads.onChanged.removeListener(onChanged);
+                resolve();
+            }
+        };
+        chrome.downloads.onChanged.addListener(onChanged);
+        // 兜底：5 秒后无论如何都释放
+        setTimeout(() => {
+            chrome.downloads.onChanged.removeListener(onChanged);
+            resolve();
+        }, 5000);
+    });
 }
 
 function sanitizeFilename(name) {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-// 把 chrome.cookies.Cookie[] 转成 Netscape cookies.txt 格式
-// 参考：https://curl.se/docs/http-cookies.html
-function cookiesToNetscape(cookies, sourceDomain) {
-    const header = [
-        '# Netscape HTTP Cookie File',
-        '# Generated by Cookie复制器',
-        `# Source domain: ${sourceDomain || ''}`,
-        `# ${new Date().toISOString()}`,
-        ''
-    ].join('\n');
-
-    const lines = cookies.map(c => {
-        // hostOnly=true 的 cookie 不应有前置点
-        const domain = c.hostOnly
-            ? c.domain
-            : (c.domain.startsWith('.') ? c.domain : '.' + c.domain);
-        const includeSubdomains = (!c.hostOnly && domain.startsWith('.')) ? 'TRUE' : 'FALSE';
-        const path = c.path || '/';
-        const secure = c.secure ? 'TRUE' : 'FALSE';
-        const expiration = c.expirationDate ? Math.floor(c.expirationDate) : 0;
-        return [domain, includeSubdomains, path, secure, expiration, c.name, c.value].join('\t');
-    });
-
-    return header + lines.join('\n') + '\n';
+// 把 chrome.cookies.Cookie[] 拼成 HTTP Cookie 请求头格式：
+// name1=value1; name2=value2; ...
+// 直接复制即可粘到 curl -H "Cookie: ..." 或 Postman 的 Cookie 字段。
+function cookiesToHeader(cookies) {
+    return cookies
+        .map(c => `${c.name}=${c.value || ''}`)
+        .join('; ');
 }
 
 // service worker 启动时立即检查一次 alarm（防止 manifest 升级导致 alarm 丢失）
