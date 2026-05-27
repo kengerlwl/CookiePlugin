@@ -380,10 +380,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     const syncPanel = document.getElementById('sync-panel');
     const syncEnabledChk = document.getElementById('sync-enabled');
     const syncIntervalSel = document.getElementById('sync-interval');
-    const syncWriteModeSel = document.getElementById('sync-write-mode');
-    const fsaDirRow = document.getElementById('fsa-dir-row');
-    const fsaDirName = document.getElementById('fsa-dir-name');
-    const fsaPickDirBtn = document.getElementById('fsa-pick-dir');
     const syncDomainInput = document.getElementById('sync-domain-input');
     const syncAddDomainBtn = document.getElementById('sync-add-domain');
     const syncAddCurrentBtn = document.getElementById('sync-add-current');
@@ -393,15 +389,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     const syncSaveBtn = document.getElementById('sync-save');
     const syncRunNowBtn = document.getElementById('sync-run-now');
 
-    // popup 内持有的 FSA 目录句柄（仅 popup 打开期间有效）
-    let fsaDirHandle = null;
-
     const DEFAULT_SYNC_CONFIG = {
         enabled: false,
         intervalMinutes: 5,
-        writeMode: 'download',
         domains: [],
-        fsaDirName: '',
         lastSyncTime: 0,
         lastSyncStatus: ''
     };
@@ -448,21 +439,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         return new Date(ts).toLocaleString();
     }
 
-    function refreshFsaDirRow(mode, dirNameText) {
-        if (mode === 'fsa') {
-            fsaDirRow.classList.remove('hidden');
-            fsaDirName.textContent = dirNameText || '未选择';
-        } else {
-            fsaDirRow.classList.add('hidden');
-        }
-    }
-
     async function refreshSyncUI() {
         const cfg = await loadSyncConfig();
         syncEnabledChk.checked = cfg.enabled;
         syncIntervalSel.value = String(cfg.intervalMinutes);
-        syncWriteModeSel.value = cfg.writeMode;
-        refreshFsaDirRow(cfg.writeMode, cfg.fsaDirName);
         renderDomainList(cfg.domains);
         syncLastTime.textContent = formatTime(cfg.lastSyncTime);
         syncLastStatus.textContent = cfg.lastSyncStatus || '空闲';
@@ -481,31 +461,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     togglePanelBtn.addEventListener('click', () => {
         syncPanel.classList.toggle('hidden');
-    });
-
-    syncWriteModeSel.addEventListener('change', () => {
-        refreshFsaDirRow(syncWriteModeSel.value, fsaDirName.textContent);
-    });
-
-    fsaPickDirBtn.addEventListener('click', async () => {
-        if (typeof window.showDirectoryPicker !== 'function') {
-            showStatus('当前浏览器不支持 File System Access API', 'error');
-            return;
-        }
-        try {
-            const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            fsaDirHandle = handle;
-            fsaDirName.textContent = handle.name;
-            const cfg = await loadSyncConfig();
-            cfg.fsaDirName = handle.name;
-            await saveSyncConfig(cfg);
-            showStatus(`已选择目录：${handle.name}`, 'success');
-        } catch (err) {
-            if (err && err.name !== 'AbortError') {
-                console.error(err);
-                showStatus('选择目录失败：' + err.message, 'error');
-            }
-        }
     });
 
     syncAddDomainBtn.addEventListener('click', async () => {
@@ -564,7 +519,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const cfg = await loadSyncConfig();
         cfg.enabled = syncEnabledChk.checked;
         cfg.intervalMinutes = parseInt(syncIntervalSel.value, 10) || 5;
-        cfg.writeMode = syncWriteModeSel.value;
         await saveSyncConfig(cfg);
 
         chrome.runtime.sendMessage({ action: 'syncConfigUpdated' }, () => {
@@ -579,28 +533,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
 
-        if (cfg.writeMode === 'fsa' && fsaDirHandle) {
-            try {
-                const result = await syncCookiesViaFSA(cfg.domains, fsaDirHandle);
-                cfg.lastSyncTime = Date.now();
-                cfg.lastSyncStatus = `成功（FSA）：${result.length} 个域名`;
-                await saveSyncConfig(cfg);
-                await refreshSyncUI();
-                showStatus(`已写入 ${result.length} 个文件到 ${fsaDirHandle.name}`, 'success');
-            } catch (err) {
-                console.error(err);
-                cfg.lastSyncStatus = '失败：' + err.message;
-                await saveSyncConfig(cfg);
-                await refreshSyncUI();
-                showStatus('写入失败：' + err.message, 'error');
-            }
-            return;
-        }
-
-        if (cfg.writeMode === 'fsa' && !fsaDirHandle) {
-            showStatus('FSA 模式需先选择目录，将自动降级为下载', 'info');
-        }
-
         chrome.runtime.sendMessage({ action: 'runSyncNow' }, (resp) => {
             if (resp && resp.success) {
                 showStatus(`已触发同步 ${resp.count} 个域名`, 'success');
@@ -610,40 +542,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
     });
-
-    async function syncCookiesViaFSA(domains, dirHandle) {
-        const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') {
-            const req = await dirHandle.requestPermission({ mode: 'readwrite' });
-            if (req !== 'granted') {
-                throw new Error('未授予目录写入权限');
-            }
-        }
-
-        const written = [];
-        for (const domain of domains) {
-            const cookies = await chrome.cookies.getAll({ domain });
-            const text = cookiesToHeader(cookies);
-            const filename = `cookies-${sanitizeFilename(domain)}.txt`;
-            const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(text);
-            await writable.close();
-            written.push(domain);
-        }
-        return written;
-    }
-
-    function sanitizeFilename(name) {
-        return name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    }
-
-    // HTTP Cookie 请求头格式：name1=value1; name2=value2; ...
-    function cookiesToHeader(cookies) {
-        return cookies
-            .map(c => `${c.name}=${c.value || ''}`)
-            .join('; ');
-    }
 
     // 监听 storage 变化，实时刷新 UI（例如 background 完成同步后写入 lastSyncTime）
     chrome.storage.onChanged.addListener((changes, area) => {

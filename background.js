@@ -224,9 +224,7 @@ const SYNC_ALARM_NAME = 'cookieSyncAlarm';
 const DEFAULT_SYNC_CONFIG = {
     enabled: false,
     intervalMinutes: 5,
-    writeMode: 'download', // 'download' | 'fsa'，service worker 中 fsa 模式会回退到 download
     domains: [],
-    fsaDirName: '',
     lastSyncTime: 0,
     lastSyncStatus: ''
 };
@@ -292,9 +290,8 @@ async function runCookieSync({ trigger } = {}) {
         try {
             const cookies = await chrome.cookies.getAll({ domain });
             const text = cookiesToHeader(cookies);
-            // 注意：filename 不要带子目录，Chrome 对 blob: URL + 带斜杠 filename 在某些
-            // 场景会丢弃 filename 退回默认名（变成 uuid 或「下载.txt」）。
-            const filename = `cookies-${sanitizeFilename(domain)}.txt`;
+            // 写到 ~/Downloads/cookies/cookies-<domain>.txt，覆盖式更新
+            const filename = `cookies/cookies-${sanitizeFilename(domain)}.txt`;
             await downloadAsFile(text, filename);
             success++;
         } catch (err) {
@@ -323,20 +320,39 @@ const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
 let creatingOffscreen = null;
 
 async function ensureOffscreenDocument() {
-    // 已存在则直接返回
-    if (await hasOffscreenDocument()) return;
-    if (creatingOffscreen) {
+    if (!(await hasOffscreenDocument())) {
+        if (!creatingOffscreen) {
+            creatingOffscreen = chrome.offscreen.createDocument({
+                url: OFFSCREEN_DOCUMENT_PATH,
+                reasons: ['BLOBS'],
+                justification: '生成 blob: URL 用于把 cookie 写入下载文件'
+            }).finally(() => {
+                creatingOffscreen = null;
+            });
+        }
         await creatingOffscreen;
-        return;
     }
-    creatingOffscreen = chrome.offscreen.createDocument({
-        url: OFFSCREEN_DOCUMENT_PATH,
-        reasons: ['BLOBS'],
-        justification: '生成 blob: URL 用于把 cookie 写入下载文件'
-    }).finally(() => {
-        creatingOffscreen = null;
-    });
-    await creatingOffscreen;
+    // 即使 createDocument 已 resolve，offscreen 内部脚本也可能尚未完成 listener 注册；
+    // 用 ping 轮询直到拿到响应，避免后续 sendMessage 落空导致下载用到不完整的 blob URL。
+    await waitOffscreenReady();
+}
+
+async function waitOffscreenReady(maxAttempts = 30, intervalMs = 50) {
+    for (let i = 0; i < maxAttempts; i++) {
+        try {
+            const resp = await new Promise((resolve) => {
+                chrome.runtime.sendMessage({ target: 'offscreen', action: 'ping' }, (r) => {
+                    // 没有 listener 时 lastError 会被设置；忽略并继续重试
+                    void chrome.runtime.lastError;
+                    resolve(r);
+                });
+            });
+            if (resp && resp.success) return;
+        } catch (_) { /* ignore */ }
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+    // 兜底：仍然继续（不抛错），让后续逻辑自己暴露问题
+    console.warn('[Sync] offscreen ping 超时，仍继续后续流程');
 }
 
 async function hasOffscreenDocument() {
@@ -364,20 +380,60 @@ function sendOffscreen(payload) {
     });
 }
 
-// 通过 chrome.downloads 把内容写入下载目录
-async function downloadAsFile(text, filename) {
+// 跨上下文 blob URL 在 service worker 调 chrome.downloads.download 时，
+// Chrome 会忽略 filename 字段、退回 UUID 命名。可靠的解法是用 onDeterminingFilename
+// 钩子，在文件即将落盘的最后一刻强制改写文件名。
+//
+// 由于 onDeterminingFilename 触发时机早于 download() 的 callback 返回 downloadId，
+// 这里用一个 FIFO 队列：每次 download() 之前先把目标 filename 推入队列，
+// 监听器触发时按入队顺序消费——配合 syncDownloads 串行调度，保证一一对应。
+const filenameQueue = [];
+let determiningListenerRegistered = false;
+// 串行锁：保证 download() 调用与 onDeterminingFilename 一一对应，避免并发错乱
+let downloadChain = Promise.resolve();
+
+function registerDeterminingFilenameOnce() {
+    if (determiningListenerRegistered) return;
+    determiningListenerRegistered = true;
+    chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+        if (filenameQueue.length > 0) {
+            const desired = filenameQueue.shift();
+            suggest({ filename: desired, conflictAction: 'overwrite' });
+        } else {
+            // 不是本插件发起的下载（用户其它行为），放行
+            suggest();
+        }
+    });
+}
+
+// 由 offscreen 负责生成 blob URL（offscreen 没有 chrome.downloads 权限），
+// service worker 自己调用 chrome.downloads.download 完成下载，最后让 offscreen 撤销 URL。
+function downloadAsFile(text, filename) {
+    // 串行排队，避免多个下载并发时 onDeterminingFilename 与 filenameQueue 错位
+    const job = downloadChain.then(() => doDownload(text, filename));
+    downloadChain = job.catch(() => { /* swallow，不要让链断 */ });
+    return job;
+}
+
+async function doDownload(text, filename) {
+    registerDeterminingFilenameOnce();
     await ensureOffscreenDocument();
+
     const { url: blobUrl } = await sendOffscreen({
         action: 'createBlobUrl',
         text,
         mimeType: 'text/plain;charset=utf-8'
     });
 
+    // 必须在调 download() 之前 push，确保 onDeterminingFilename 能拿到
+    filenameQueue.push(filename);
+
+    let downloadId;
     try {
-        const downloadId = await new Promise((resolve, reject) => {
+        downloadId = await new Promise((resolve, reject) => {
             chrome.downloads.download({
                 url: blobUrl,
-                filename: filename,
+                filename: filename, // 备份字段，listener 优先
                 conflictAction: 'overwrite',
                 saveAs: false
             }, (id) => {
@@ -391,16 +447,19 @@ async function downloadAsFile(text, filename) {
             });
         });
 
-        // 等下载真正完成后再释放 ObjectURL，避免下载中途被中断
         await waitDownloadComplete(downloadId);
         return downloadId;
+    } catch (err) {
+        // 调用失败时，要把队列里的占位清掉，否则会错位污染下一个下载
+        const idx = filenameQueue.indexOf(filename);
+        if (idx >= 0) filenameQueue.splice(idx, 1);
+        throw err;
     } finally {
-        // 不阻塞主流程：撤销失败也只是泄漏一份内存，下次 SW 重启会回收
-        sendOffscreen({ action: 'revokeBlobUrl', url: blobUrl }).catch(() => {});
+        sendOffscreen({ action: 'revokeBlobUrl', url: blobUrl }).catch(() => { /* ignore */ });
     }
 }
 
-// 等待某个下载到达 complete/interrupted 终态
+// 等待下载到达终态（complete/interrupted）
 function waitDownloadComplete(downloadId) {
     return new Promise((resolve) => {
         const onChanged = (delta) => {
@@ -411,7 +470,7 @@ function waitDownloadComplete(downloadId) {
             }
         };
         chrome.downloads.onChanged.addListener(onChanged);
-        // 兜底：5 秒后无论如何都释放
+        // 兜底：5 秒后释放
         setTimeout(() => {
             chrome.downloads.onChanged.removeListener(onChanged);
             resolve();

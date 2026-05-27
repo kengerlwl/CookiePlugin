@@ -76,20 +76,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="sync-write-mode">写入方式</label>
-                    <select id="sync-write-mode">
-                        <option value="download">下载到 Downloads/cookies/</option>
-                        <option value="fsa">写入到指定目录 (FSA)</option>
-                    </select>
-                </div>
-
-                <div id="fsa-dir-row" class="form-group hidden">
-                    <label>本地目录</label>
-                    <div class="fsa-dir-line">
-                        <span id="fsa-dir-name" class="fsa-dir-name">未选择</span>
-                        <button id="fsa-pick-dir" class="btn btn-outline btn-small">选择目录</button>
-                    </div>
-                    <p class="fsa-tip">注意：浏览器重启后需要重新选择目录</p>
+                    <label>写入位置</label>
+                    <p class="sync-write-hint">~/Downloads/cookies/cookies-&lt;域名&gt;.txt（覆盖式更新）</p>
                 </div>
 
                 <div class="form-group">
